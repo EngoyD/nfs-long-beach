@@ -40,7 +40,7 @@ const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'hi
 renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
 renderer.setSize(window.innerWidth, window.innerHeight);
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
-renderer.toneMappingExposure = 0.96;
+renderer.toneMappingExposure = 0.86;
 renderer.domElement.classList.add('game');
 app.appendChild(renderer.domElement);
 
@@ -48,7 +48,7 @@ const scene = new THREE.Scene();
 const camera = new THREE.PerspectiveCamera(58, window.innerWidth / window.innerHeight, 0.5, 30000);
 camera.position.set(0, 4, 10);
 
-scene.fog = new THREE.FogExp2(0xd3d2cd, 0.00042);
+scene.fog = new THREE.FogExp2(0xc9cdd2, 0.00026);
 
 // Physical atmosphere (Preetham) — sun disc, haze, correct horizon falloff.
 const sky = new Sky();
@@ -123,8 +123,8 @@ function applyTimeOfDay() {
     bloom.strength = 0.62;
   } else {
     setSun(24, 55);
-    scene.fog.color.setHex(0xd3d2cd);
-    scene.fog.density = 0.00042;
+    scene.fog.color.setHex(0xc9cdd2);
+    scene.fog.density = 0.00026;
     hemi.color.setHex(0xbdd4ff);
     hemi.groundColor.setHex(0x8a7c68);
     hemi.intensity = 1.05;
@@ -333,9 +333,11 @@ function placePalmsIfReady() {
   const medianY = ys[ys.length >> 1];
   if (pendingTrees && !palms) {
     const pts = pendingTrees.map((t) => geoToWorld(tiles, t.lat, t.lon, 0));
-    // line the route's sidewalks with palms (staggered ~28m), skipping spots
-    // already covered by a mapped tree — Shoreline Drive is palm-lined for real
+    // Shoreline Drive is palm-lined in reality, but only plant extra palms
+    // where Google actually reconstructed something tall and melted — a
+    // one-time probe per candidate, never per frame (that stalls streaming).
     const step = 7;
+    const probe = new THREE.Vector3();
     for (let i = 0; i < road.centers.length; i += step) {
       const c = road.centers[i];
       const s = road.sides[i];
@@ -345,6 +347,9 @@ function placePalmsIfReady() {
         const x = c.x + s.x * off * sign;
         const z = c.z + s.z * off * sign;
         if (pts.some((p) => (p.x - x) ** 2 + (p.z - z) ** 2 < 144)) continue;
+        probe.set(x, c.y + 14, z);
+        const surf = sampleGround(probe, 0, false);
+        if (!surf || surf.y - c.y < 3) continue; // nothing melted here — skip
         pts.push(new THREE.Vector3(x, 0, z));
       }
     }
@@ -366,6 +371,10 @@ function placePalmsIfReady() {
 // Route preload: scout marches the full circuit during the loading screen so
 // the city is crisp before the player gets control.
 const preload = { t: 0, done: false, startedAt: 0 };
+// In photoreal mode the synthetic road is hidden by default so the real
+// Long Beach surface shows through; toggled from the pause menu.
+const OVERLAY_STORAGE = 'nfslb_overlay';
+let overlayRoad = localStorage.getItem(OVERLAY_STORAGE) === 'on';
 let mode = 'menu';         // menu | loading | countdown | race | freeroam | finished
 let paused = false;
 let freeRoam = true;       // cruising is the default; racing is opt-in via menu
@@ -503,8 +512,15 @@ function computeCircuitWorld() {
   return CIRCUIT.map((cp) => geoToWorldFlat(cp.lat, cp.lon));
 }
 
+// Free roam starts on the Shoreline Drive front straight facing downtown —
+// harbor on one side, skyline ahead. The race start/finish sits by the marina
+// parking lots, which is a far weaker first impression.
+const SCENIC_SPAWN = 2;
+
 function spawnCar() {
-  const pose = race.spawnPose();
+  const pose = freeRoam && race.worldPos.length > SCENIC_SPAWN + 1
+    ? race.poseAt(SCENIC_SPAWN)
+    : race.spawnPose();
   const ground = sampleGround(pose.pos, 60);
   if (ground) pose.pos.y = ground.y;
   physics.place(pose.pos, pose.yaw);
@@ -541,6 +557,7 @@ const storedKey = localStorage.getItem(KEY_STORAGE);
 if (storedKey) $('apiKeyInput').value = storedKey;
 qualityBtn.textContent = `QUALITY: ${QUALITIES[qualityIdx].name}`;
 modeBtn.textContent = freeRoam ? 'SWITCH TO RACE' : 'SWITCH TO FREE ROAM';
+$('roadBtn').textContent = overlayRoad ? 'ROAD: OVERLAY' : 'ROAD: REAL';
 
 // Clean up paste accidents: whitespace, and the key pasted twice back-to-back.
 function sanitizeKey(raw) {
@@ -591,6 +608,12 @@ qualityBtn.addEventListener('click', () => {
 $('keyBtn').addEventListener('click', () => {
   window.location.reload();
 });
+$('roadBtn').addEventListener('click', () => {
+  overlayRoad = !overlayRoad;
+  localStorage.setItem(OVERLAY_STORAGE, overlayRoad ? 'on' : 'off');
+  $('roadBtn').textContent = overlayRoad ? 'ROAD: OVERLAY' : 'ROAD: REAL';
+  if (road && tiles) road.setVisible(overlayRoad);
+});
 $('muteBtn').addEventListener('click', () => {
   const muted = audio.toggleMute();
   $('muteBtn').textContent = muted ? 'SOUND: OFF' : 'SOUND: ON';
@@ -611,7 +634,8 @@ async function startWorld(apiKey) {
     mode = 'loading';
     show(loadingEl);
     slippy.initGoogle(apiKey); // live Google map in the minimap
-    tiles = createTiles(apiKey, camera, renderer, tileTint, () => corridor, () => treeGrid);
+    tiles = createTiles(apiKey, camera, renderer, tileTint,
+      () => (overlayRoad ? corridor : null), () => treeGrid);
     tiles.errorTarget = QUALITIES[qualityIdx].errorTarget;
     tiles.setCamera(scoutCam);
     tiles.setResolution(scoutCam, 1024, 1024); // high-res during route preload
@@ -632,6 +656,9 @@ async function startWorld(apiKey) {
       road = buildRoad(scene, pts, renderer.capabilities.getMaxAnisotropy());
       roadStable = false;
       corridor = buildCorridor(road.centers);
+      // Photoreal mode shows Google's actual street — real markings, real
+      // crosswalks, real curbs. The ribbon stays for collision only.
+      road.setVisible(overlayRoad);
       // real tree positions → sink Google's melted spikes, plant good palms
       fetch(`${import.meta.env.BASE_URL}lb-trees.json`).then((r) => r.ok ? r.json() : null).then((tj) => {
         if (tj && tj.trees) pendingTrees = tj.trees;

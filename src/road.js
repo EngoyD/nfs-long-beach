@@ -325,7 +325,14 @@ export function buildRoad(scene, worldPoints, maxAniso = 16, lift = LIFT) {
   }
 
   return {
-    mesh, edges, redrape, curve, centers, sides,
+    mesh, edges, lawn, redrape, curve, centers, sides,
+    // Hidden meshes still raycast, so the ribbon keeps serving as the smooth
+    // driving surface while Google's real street stays visible.
+    setVisible(on) {
+      mesh.visible = on;
+      edges.visible = on;
+      lawn.visible = on;
+    },
     get drapedFraction() {
       let c = 0;
       for (let i = 0; i < n; i++) c += draped[i];

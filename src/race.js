@@ -114,6 +114,14 @@ export class Race {
 
   target() { return this.worldPos[this.idx]; }
 
+  // Pose at any checkpoint, facing the next one.
+  poseAt(i) {
+    const p0 = this.worldPos[i % this.worldPos.length];
+    const p1 = this.worldPos[(i + 1) % this.worldPos.length];
+    const yaw = Math.atan2(-(p1.x - p0.x), -(p1.z - p0.z));
+    return { pos: p0.clone(), yaw };
+  }
+
   spawnPose() {
     // Spawn at start line pointing at checkpoint 1.
     const p0 = this.worldPos[0];
