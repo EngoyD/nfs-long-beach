@@ -49,7 +49,19 @@
       "Bash(curl -s -m 100 -X POST https://overpass.private.coffee/api/interpreter --data-urlencode 'data=[out:json][timeout:90];\\(way[\"natural\"=\"water\"]\\(33.750,-118.215,33.780,-118.165\\);relation[\"natural\"=\"water\"]\\(33.750,-118.215,33.780,-118.165\\);way[\"natural\"=\"coastline\"]\\(33.750,-118.215,33.780,-118.165\\);\\);out geom;' -o water.json)",
       "Bash(npm i *)",
       "Bash(curl -s -m 90 -X POST https://overpass.private.coffee/api/interpreter --data-urlencode 'data=[out:json][timeout:80];\\(node[\"natural\"=\"tree\"]\\(33.755,-118.208,33.777,-118.172\\);\\);out;' -o trees.json)",
-      "Bash(npx esbuild *)"
+      "Bash(npx esbuild *)",
+      "Bash(gh repo *)",
+      "Bash(gh api *)",
+      "Bash(gh workflow *)",
+      "Bash(gh run *)",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\" https://engoyd.github.io/nfs-long-beach/)",
+      "Bash(npm run *)",
+      "Bash(npx vite *)",
+      "Bash(curl -s -o /dev/null -w \"%{http_code} \" http://localhost:4174/ferrari.glb)",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\\\\n\" http://localhost:4174/lb-city.json)",
+      "Bash(git add *)",
+      "Bash(git commit -q -m ' *)",
+      "Bash(git push *)"
     ]
   }
 }

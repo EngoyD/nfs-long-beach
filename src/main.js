@@ -633,10 +633,10 @@ async function startWorld(apiKey) {
       roadStable = false;
       corridor = buildCorridor(road.centers);
       // real tree positions → sink Google's melted spikes, plant good palms
-      fetch('/lb-trees.json').then((r) => r.ok ? r.json() : null).then((tj) => {
+      fetch(`${import.meta.env.BASE_URL}lb-trees.json`).then((r) => r.ok ? r.json() : null).then((tj) => {
         if (tj && tj.trees) pendingTrees = tj.trees;
       }).catch(() => {});
-      fetch('/lb-city.json').then((r) => r.ok ? r.json() : null).then((cj) => {
+      fetch(`${import.meta.env.BASE_URL}lb-city.json`).then((r) => r.ok ? r.json() : null).then((cj) => {
         if (cj && cj.roads) pendingRoads = cj.roads;
       }).catch(() => {});
     });
@@ -664,7 +664,7 @@ async function startWorld(apiKey) {
     const circuitXZ = circuitWorld.map((p) => ({ x: p.x, z: p.z }));
     let clean = null;
     try {
-      const res = await fetch('/lb-city.json');
+      const res = await fetch(`${import.meta.env.BASE_URL}lb-city.json`);
       if (res.ok) {
         clean = buildCleanCity(scene, await res.json(), circuitXZ,
           renderer.capabilities.getMaxAnisotropy(), envMap);

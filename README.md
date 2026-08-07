@@ -1,5 +1,11 @@
 # NFS: Long Beach
 
+**Play: https://engoyd.github.io/nfs-long-beach/**
+
+Paste a Google Maps API key on the start screen for the photoreal city, or hit
+**CLEAN CITY — NO KEY** to drive right away. The key is stored per site, so the
+hosted version asks for it separately from a local copy.
+
 Browser street-racing game set in the real Long Beach, CA — streamed as Google **Photorealistic 3D Tiles** (actual photogrammetry of the city: Shoreline Drive, the Aquarium, Queen Mary, downtown towers). Race a 3-lap sprint around the Grand Prix of Long Beach street circuit, or free-roam the city.
 
 ## Run

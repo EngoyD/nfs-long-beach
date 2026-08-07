@@ -463,7 +463,8 @@ export async function loadRealCar(envMap) {
   const draco = new DRACOLoader();
   draco.setDecoderPath('https://www.gstatic.com/draco/versioned/decoders/1.5.7/');
   loader.setDRACOLoader(draco);
-  const gltf = await loader.loadAsync('/ferrari.glb');
+  // BASE_URL keeps assets resolvable when deployed under a subpath (Pages)
+  const gltf = await loader.loadAsync(`${import.meta.env.BASE_URL}ferrari.glb`);
   const model = gltf.scene.children[0];
 
   const paint = new THREE.MeshPhysicalMaterial({
