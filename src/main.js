@@ -455,6 +455,33 @@ function sampleGround(pos, castUp = 4, includeRoad = true, pickLowest = false) {
   return { y: hit.point.y, normal };
 }
 
+// The car's ground probe has to survive tile LOD swaps. A single frame with no
+// mesh under the ray would start it falling, and once it sinks more than the
+// ray's head start the downward cast begins *below* the surface and can never
+// find it again — the car falls through the world. So: always cast from above
+// the last known ground, and hold that height briefly when a sample misses.
+const carGround = { y: null, normal: new THREE.Vector3(0, 1, 0), miss: 0 };
+let frameDt = 0.016;
+
+function sampleCarGround(pos) {
+  const castUp = carGround.y === null
+    ? 4
+    : Math.max(4, carGround.y - pos.y + 6);
+  const g = sampleGround(pos, castUp);
+  if (g) {
+    carGround.y = g.y;
+    carGround.normal.copy(g.normal);
+    carGround.miss = 0;
+    return g;
+  }
+  carGround.miss += frameDt;
+  // brief coyote time over streaming gaps; a real drop still falls
+  if (carGround.y !== null && carGround.miss < 0.5) {
+    return { y: carGround.y, normal: carGround.normal };
+  }
+  return null;
+}
+
 const OBSTACLE_DIRS = [0, 0.6, -0.6, 1.5708, -1.5708, Math.PI];
 const _dir = new THREE.Vector3();
 const _hitList = [];
@@ -523,6 +550,8 @@ function spawnCar() {
     : race.spawnPose();
   const ground = sampleGround(pose.pos, 60);
   if (ground) pose.pos.y = ground.y;
+  carGround.y = null; // forget stale ground after a teleport
+  carGround.miss = 0;
   physics.place(pose.pos, pose.yaw);
   physics.nitro = 100;
   lastSafePose = { pos: pose.pos.clone(), yaw: pose.yaw };
@@ -537,6 +566,8 @@ function resetCar() {
   const p = pose.pos.clone();
   const ground = sampleGround(p, 60);
   if (ground) p.y = ground.y;
+  carGround.y = null; // forget stale ground after a teleport
+  carGround.miss = 0;
   physics.place(p, pose.yaw);
   snapCamera();
 }
@@ -875,6 +906,12 @@ function syncCarVisual(dt) {
   const springA = 70 * (physics.pos.y - susp.y) - 13 * susp.vy;
   susp.vy += springA * dt;
   susp.y += susp.vy * dt;
+  // the body may compress toward the contact point but never through it —
+  // otherwise a sharp rise leaves the car visually buried in the road
+  if (susp.y < physics.pos.y - 0.12) {
+    susp.y = physics.pos.y - 0.12;
+    susp.vy = Math.max(susp.vy, 0);
+  }
   // accel/brake pitch dip
   const accel = dt > 0 ? (physics.forwardSpeed - susp.lastF) / dt : 0;
   susp.lastF = physics.forwardSpeed;
@@ -1030,7 +1067,8 @@ function tick(now) {
     const effInput = inputLocked
       ? { throttle: 0, brake: 0, steer: input.steer, handbrake: false, nitro: false }
       : input;
-    physics.update(dt, effInput, sampleGround, sampleObstacles);
+    frameDt = dt;
+    physics.update(dt, effInput, sampleCarGround, sampleObstacles);
 
     if (wantReset || physics.pos.y < -120 || physics.airTime > 5) resetCar();
 
@@ -1140,6 +1178,7 @@ setInterval(() => {
 
 // dev debug handles
 window.__ready = () => readyToDrive();
+window.__sink = (d = 15) => { physics.pos.y -= d; };
 window.__preload = () => ({ ...preload, worldPos: race.worldPos.length });
 window.__scene = scene;
 window.__r = { renderer, camera, composer };
